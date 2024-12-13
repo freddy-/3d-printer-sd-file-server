@@ -1,0 +1,16 @@
+{
+  "done": true,
+  "effectivePrint": false,
+  "effectiveSelect": false,
+  "files": {
+    "local": {
+      "name": "card-10_16m_0.20mm.gcode",
+      "origin": "local",
+      "path": "card-10_16m_0.20mm.gcode",
+      "refs": {
+        "download": "http://192.168.0.54/downloads/files/local/card-10_16m_0.20mm.gcode",
+        "resource": "http://192.168.0.54/api/files/local/card-10_16m_0.20mm.gcode"
+      }
+    }
+  }
+}

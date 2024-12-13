@@ -1,0 +1,21 @@
+GET /api/version HTTP/1.1
+Host: 192.168.0.54
+User-Agent: PrusaSlicer/2.7.4+linux-x64-GTK2
+Accept: */*
+X-Api-Key: 5A087F5E36E2404BA553206FC6FF3E77
+
+HTTP/1.1 200 OK
+content-type: application/json
+content-length: 71
+cache-control: max-age=0
+x-clacks-overhead: GNU Terry Pratchett
+server-timing: app;dur=35
+x-robots-tag: noindex, nofollow, noimageindex
+x-content-type-options: nosniff
+x-frame-options: sameorigin
+
+{
+  "api": "0.1",
+  "server": "1.10.1",
+  "text": "OctoPrint 1.10.1"
+}

@@ -1,0 +1,19 @@
+<html>
+  <head>
+    <script>
+      function submitData(e) {
+        let size = document.getElementById("file-input").files[0].size;
+        document.getElementById("size-field").value = size;
+      }
+    </script>
+  </head>
+  <body>
+    <div>
+      <form name="form" method='POST' action='http://192.168.0.70/update' enctype='multipart/form-data' onsubmit="submitData(event);">
+        <input id="size-field" type="hidden" name="size" value="100"/>
+        <input id="file-input" type='file' name='update' accept=".bin"/>
+        <input type='submit' value='Update'/>
+      </form>  
+    </div>
+  </body>
+</html>
