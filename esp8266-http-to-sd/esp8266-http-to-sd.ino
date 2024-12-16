@@ -6,26 +6,17 @@
  *  
  *  This project is based on ardyesp/ESPWebDAV and FYSETC/ESPWebDAV.
  * 
- * Use ESP8266 version 2.4.X!!!
- * USe SdFat version 1.1.4
+ * Use ESP8266 version 3.1.2
  */
 
-// testar updater ota
-// usar como exemplo:
-// ESP8266HTTPUpdate
-// Updater.h e 
-// ArduinoOTAClass::_runUpdate()
-// WebUpdate.ino
-
 // armazenar string na flash sendHeader(String(F("Connection")), String(F("close")));
-
-
-// TODO antes de iniciar qualquer aceso ao cartão SD
-// simular uma desconexão do cartao SD e fazer um init dele, pois ele já vai estar operando em SDIO
 
 #include <ESP8266WiFi.h>
 #include <SPI.h>
 #include <SdFat.h>
+#include "html/index_htm.h"
+#include "./wifi-credentials.h"
+
 
 // Pins
 #define SD_POWER    16 // D0
@@ -38,19 +29,17 @@
 // TODO get this data from sd card config.ini file
 // ssid;passwd
 
-const char* ssid = "xxxxxxxxx";
-const char* password = "xxxxxxxxxx";
+extern const char* ssid;
+extern const char* password;
 
 // Create an instance of the server
 // specify the port to listen on as an argument
 WiFiServer server(80);
-SdFat sd;
+SdFat32 sd;
+String ipAddr;
 uint32_t maxSketchSpace;
 
 void setup() {
-
-  Update.begin(10, U_FLASH);
-
   // first of all, power the SD card (it's already high at esp boot)
   pinMode(SD_POWER, OUTPUT);
   digitalWrite(SD_POWER, HIGH);
@@ -66,7 +55,7 @@ void setup() {
 
 
   Serial.begin(115200);
-  Serial.println();
+  Serial.printf("Update %d\n", Update.size());
   delay(10);
 
   maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
@@ -94,7 +83,8 @@ void setup() {
   Serial.println("Server started");
 
   // Print the IP address
-  Serial.println(WiFi.localIP());
+  ipAddr = WiFi.localIP().toString();
+  Serial.println(ipAddr);
 
 }
 
@@ -107,8 +97,14 @@ void loop() {
   
   // Wait until the client sends some data
   Serial.println("\nnew client");
-  while(!client.available()){
+  int timeout_ms = 1000;
+  while(!client.available() && --timeout_ms) {
     delay(1);
+  }
+
+  if (!timeout_ms) {
+    Serial.println("Client timed out!");
+    return;
   }
   
   // Read the first line of the request
@@ -117,7 +113,13 @@ void loop() {
   Serial.println(req);
   
   // Match the request
-  if (req.indexOf("/api/version") != -1) {
+  if (req.indexOf("GET / HTTP") != -1) {
+    client.print("HTTP/1.1 200 OK\r\n");
+    client.print("Content-Type:text/html\r\n\r\n");
+    client.print("<h1>ESP8266 to 3D Printer SD File Server</h1>");
+    return;
+
+  } else if (req.indexOf("GET /api/version") != -1) {
     client.print("HTTP/1.1 200 OK\r\n\r\n{\"api\":\"0.1\",\"text\":\"OctoPrint 1.10.1\"}");
     return;
     
@@ -178,14 +180,15 @@ void loop() {
     takeSdBus();
 
     // SD init
-    if (sd.begin(CS_PIN, SPI_FULL_SPEED)) { //SPI_DIV3_SPEED SPI_FULL_SPEED SPI_HALF_SPEED
+    if (sd.begin(SdSpiConfig(CS_PIN, DEDICATED_SPI, SPI_FULL_SPEED))) { //SPI_DIV3_SPEED SPI_FULL_SPEED SPI_HALF_SPEED
       Serial.println("SD init ok");
     } else {
       Serial.println("SD init fail!!!!!");
+      return;
     }  
 
     // receber o restante do request
-    SdFile nFile;
+    File32 file;
     size_t numRemaining = fileSize;
     const size_t WRITE_BLOCK_CONST = 512;
 		uint8_t buf[WRITE_BLOCK_CONST];
@@ -199,17 +202,14 @@ void loop() {
       sd.remove(fileName.c_str());
     }
 
-    // create a contiguous file
-		if (!nFile.createContiguous(sd.vwd(), fileName.c_str(), contBlocks * WRITE_BLOCK_CONST))
-			return handleWriteError(client, "File create contiguous sections failed", &nFile);
+    if (!file.open(fileName.c_str(), O_RDWR | O_CREAT)) {
+      return handleWriteError(client, "open file failed", &file);
+    }
+    if (!file.preAllocate(fileSize)) {
+      return handleWriteError(client, "preAllocate failed", &file);
+    }
 
-		// get the location of the file's blocks
-		if (!nFile.contiguousRange(&bgnBlock, &endBlock))
-			return handleWriteError(client, "Unable to get contiguous range", &nFile);
-
-		if (!sd.card()->writeStart(bgnBlock, contBlocks))
-			return handleWriteError(client, "Unable to start writing contiguous range", &nFile);
-
+    uint32_t time = millis();
     while(numRemaining > 0)	{
 			size_t numToRead = (numRemaining > WRITE_BLOCK_CONST) ? WRITE_BLOCK_CONST : numRemaining;
 			size_t numRead = readBytesWithTimeout(client, buf, sizeof(buf), numToRead);
@@ -217,22 +217,24 @@ void loop() {
 			if(numRead == 0)
 				break;
 
-			if (!sd.card()->writeData(buf))
-				return handleWriteError(client, "Write data failed", &nFile);
+      if (file.write(buf, numRead) != numRead) {
+        return handleWriteError(client, "Write data failed", &file);
+      }
 
 			numRemaining -= numRead;
     }
+    time = millis() - time;
+    Serial.printf("Speed: %d, time %d \n", fileSize/time, time);
 
-		// stop writing operation
-		if (!sd.card()->writeStop())
-			return handleWriteError(client, "Unable to stop writing contiguous range", &nFile);
+    if (!file.sync()) {
+      return handleWriteError(client, "File Sync failed", &file);
+    }
 
-    // truncar o arquivo no sd pra ignorar o restante do request, ex:
-    // --------------------------c5ee0ac6eeaf75ad--
-		if(!nFile.truncate(fileSize - numRemaining - boundaryLength - 6)) // 47 is the --------------------------c5ee0ac6eeaf75ad--
-			return handleWriteError(client, "Unable to truncate the file", &nFile);
+    if (!file.truncate(fileSize - numRemaining - boundaryLength - 6)) {
+      return handleWriteError(client, "Unable to truncate the file", &file);
+    }
 
-    nFile.close();
+    file.close();
 
     Serial.println("File created!");
     
@@ -255,19 +257,13 @@ void loop() {
     return;
 
   } else if (req.indexOf("GET /update") != -1) {
-    // retornar uma pagina html com um input de upload
-    const char* serverIndex = "<form method='POST' action='/update' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Update'></form>";
-
     client.print("HTTP/1.1 200 OK\r\n");
+    client.print("Content-Encoding:gzip\r\n");
     client.print("Content-Type:text/html\r\n\r\n");
-    client.print(serverIndex);
-
+    client.write(index_htm_gz, index_htm_gz_len);
     return;
 
   } else if (req.indexOf("POST /update") != -1) {
-    // primeiro teste, como o upload vai se comportar?
-    // printar tudo que receber pra ver como vai ser...
-
     // curl -F "image=@esp8266-http-to-sd.ino.generic.bin" 192.168.0.70/update
 
     size_t fileSize = 0;
@@ -288,9 +284,9 @@ void loop() {
       }
     }
     
-    Serial.setDebugOutput(true);
-
+    Serial.setDebugOutput(true);  
     if (!Update.begin(maxSketchSpace)) {    // start firmware update
+      Serial.println("Erro ao iniciar update");
       Update.printError(Serial);
     }
 
@@ -302,7 +298,6 @@ void loop() {
 
 			if(numRead == 0) break;
 
-      Serial.printf("size: %d", numRead);
       if (Update.write(buffer, numRead) != numRead) {
         Update.printError(Serial);
       }
@@ -318,29 +313,22 @@ void loop() {
     Serial.setDebugOutput(false);
 
     client.print("HTTP/1.1 302 Found\r\n");
-    client.print("Location: http://192.168.0.70/update\r\n\r\n");
+    client.print("Location: http://");
+    client.print(ipAddr);
+    client.print("/update?reboot=true\r\n\r\n");
+    return;
 
+  } else if (req.indexOf("GET /reboot") != -1) {
+    client.print("HTTP/1.1 200 ok\r\n\r\n");
+    client.flush();
     ESP.restart();
     return;
-
   } else {
     Serial.println("invalid request");
-    client.stop();
+    client.print("HTTP/1.1 404 Not Found\r\n\r\n");
+    client.flush();
     return;
   }
-  
-  client.flush();
-
-  // Prepare the response
-  String s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>\r\n...</html>\n";
-
-  // Send the response to the client
-  client.print(s);
-  delay(1);
-  Serial.println("Client disonnected");
-
-  // The client will actually be disconnected 
-  // when the function returns and 'client' object is detroyed
 }
 
 size_t readBytesWithTimeout(WiFiClient client, uint8_t *buf, size_t bufSize, size_t numToRead) {
@@ -356,10 +344,10 @@ size_t readBytesWithTimeout(WiFiClient client, uint8_t *buf, size_t bufSize, siz
 	return client.read(buf, bufSize);
 }
 
-void handleWriteError(WiFiClient client, String message, FatFile *wFile)	{
+void handleWriteError(WiFiClient client, String message, File32 *file)	{
 // ------------------------
 	// close this file
-	wFile->close();
+	file->close();
 	// delete the wrile being written
 	//sd.remove(uri.c_str());
   Serial.print("Write Error: ");
