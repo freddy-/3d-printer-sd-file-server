@@ -1,13 +1,3 @@
-/*
- *  This project mimics the file upload endpoint of OctoPrint
- *  allowing sending gcode from prusa slicer and saving direct to SD card.
- * 
- *  The SD card is shared between ESP8266 and 3d printer.
- *  
- *  This project is based on ardyesp/ESPWebDAV and FYSETC/ESPWebDAV.
- * 
- * Use ESP8266 version 3.1.2
- */
 
 // armazenar string na flash sendHeader(String(F("Connection")), String(F("close")));
 
@@ -16,6 +6,8 @@
 #include <SdFat.h>
 #include "html/index_htm.h"
 #include "./wifi-credentials.h"
+
+// TODO usar mdns pra nao precisar de ip fixo
 
 
 // Pins
