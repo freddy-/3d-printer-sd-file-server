@@ -1,110 +1,25 @@
 <html>
   <head>
-    <script defer>
-      function checkRebootAfterUpdate() {
-        const queryString = window.location.search;
-        const urlParams = new URLSearchParams(queryString);
-        if (urlParams.get("reboot")) {
-          showMessageRebooting();
-          fetch('reboot').then(function (response) {
-            // The API call was successful!
-            // return to main update page
-            window.location = "update?done=true";
-          }).catch(function (err) {
-            // There was an error
-            console.warn('Something went wrong.', err);
-          });
-
-        } else if (urlParams.get("done")) {
-          showMessageDone();
-        }
-      }
-
-      function submitData(e) {
-        showMessageUpdating();
-      }
-
-      function fileInputChange(event) {
-        let size = event.target.files[0].size;
-        document.getElementById("size-field").value = size;
-
-        let sizeKb = Number(size / 1024).toFixed(2);
-        sizeKb = `New Firmware Size: ${sizeKb}K`;
-        document.getElementById("size-label").textContent = sizeKb;
-        
-        clearMessage();
-      }
-
-      function showMessageUpdating() {
-        showMessage("Updating...", "warning");
-      }
-
-      function showMessageRebooting() {
-        showMessage("Rebooting...", "warning");
-      }
-
-      function showMessageDone() {
-        showMessage("Update done", "success");
-      }
-
-      function showMessage(msg, type) {
-        document.getElementById("msg-text").textContent = msg;
-        document.getElementById("msg-container").classList.remove("warning", "success");
-        document.getElementById("msg-container").classList.add(type);
-        document.getElementById("msg-container").classList.remove("hide");
-      }
-
-      function clearMessage() {
-        document.getElementById("msg-container").classList.add("hide");
-      }
-
-      window.onload = () => checkRebootAfterUpdate();
-    </script>
     <style>
       body {
         display: flex;
         flex-direction: column;
         align-items: center;
       }
-      form {
-        margin-block-end: 0;
-      }
       .container {
-        width: 300px;
-        border: 1px solid #ccc;
         padding: 0px 5px 5px 5px;
         height: fit-content;
         margin-bottom: 10px;
       }
-      .warning {
-        background-color: coral;
-      }
-      .success {
-        background-color: greenyellow;
-      }
-      .hide {
-        display: none;
-      }
-      .item {
-        display: block;
-        width: 100%;
-        box-sizing: border-box;
-        margin-top: 5px;
-        text-align: center;
-      }
     </style>
   </head>
   <body>
-    <div id="msg-container" class="container hide">
-      <label id="msg-text" class="item"></label>
-    </div>
     <div class="container">
-      <form name="form" method='POST' action='update' enctype='multipart/form-data' onsubmit="submitData()">
-        <input id="size-field" type="hidden" name="size" value="100"/>
-        <input class="item" id="file-input" type='file' name='update' accept=".bin" onchange="fileInputChange(event)"/>
-        <label class="item" id="size-label"></label>
-        <input class="item" type='submit' value='Update Firmware'/>
-      </form>  
+      <h1>ESP8266 to 3D Printer SD File Server</h1>
+      <nav>
+        <li><a href="list-files">List Files</a></li>
+        <li><a href="update">Update Firmware</a></li>
+      </nav>
     </div>
   </body>
 </html>

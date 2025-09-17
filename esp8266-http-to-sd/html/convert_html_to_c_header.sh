@@ -10,6 +10,20 @@
 # Requires html-minifier
 #   sudo npm install html-minifier -g
 
+echo "\n"
+
+HTML_FILE=$1.html
+HTM_FILE=$1.htm
+HTM_GZ_FILE=$HTM_FILE.gz
+HTM_H_FILE=$1_htm.h
+
+set -e # exit on first error
+
+if [ ! -f "$HTML_FILE" ]; then
+  echo "File '$HTML_FILE' does not exist or is not a regular file."
+  exit 1
+fi
+
 html-minifier \
  --case-sensitive \
  --collapse-boolean-attributes \
@@ -24,37 +38,39 @@ html-minifier \
  --remove-redundant-attributes \
  --remove-script-type-attributes \
  --remove-style-link-type-attributes \
- -o index.htm \
- index.html
+ -o $HTM_FILE \
+ $HTML_FILE
 
 if [ $? -ne 0 ]
 then
   echo "Error minifying index.htm"
-  exit -1
+  exit 1
 fi
 
-if [ -e index.htm.gz ]
+if [ -e $HTM_GZ_FILE ]
 then
-  rm index.htm.gz
+  rm $HTM_GZ_FILE
 fi
 
-gzip index.htm
+gzip $HTM_FILE
 if [ $? -ne 0 ]
 then
-  echo "Error gzipping minified index.htm"
-  exit -1
+  echo "Error gzipping minified $HTM_FILE"
+  exit 1
 fi
 
-echo '// WARNING: Auto-generated file. Please do not modify by hand.' > index_htm.h
-echo '// This file is an embeddable version of the gzipped index.htm file.' >> index_htm.h
-echo '// To update it, please rerun the `reduce_index.sh` script located in the `extras` subfolder' >> index_htm.h
-echo '// then recompile the sketch after each change to the `index.html` file.' >> index_htm.h
-xxd -i index.htm.gz >> index_htm.h
+echo '// WARNING: Auto-generated file. Please do not modify by hand.' > $HTM_H_FILE
+echo '// This file is an embeddable version of the gzipped index.htm file.' >> $HTM_H_FILE
+echo '// To update it, please rerun the `reduce_index.sh` script located in the `extras` subfolder' >> $HTM_H_FILE
+echo '// then recompile the sketch after each change to the `index.html` file.' >> $HTM_H_FILE
+xxd -i $HTM_GZ_FILE >> $HTM_H_FILE
 if [ $? -ne 0 ]
 then
-  echo "Error creating include file from index.htm.gz"
-  exit -1
+  echo "Error creating include file from $HTM_GZ_FILE"
+  exit 1
 fi
+
+rm $HTM_GZ_FILE
 
 echo Reduce complete.
 

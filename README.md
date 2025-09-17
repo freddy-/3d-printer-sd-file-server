@@ -14,7 +14,7 @@ This change in Marlin allow the SDIO lines from the SD card to be shared with th
 The tests were made using a Kingroon KP3S. This printer have a MakerBase Robin Nano clone board with a connector for a external SD board.
 
 ### Firmware update
-Firmware update can be done via browser throught url `<esp-ip>/update`
+Firmware update can be done via browser through url `<esp-ip>/update`
 
 ### Dependencies
 - [ESP8266 Arduino](https://github.com/esp8266/Arduino)  version 3.1.2
